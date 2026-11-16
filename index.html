@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kalkulačka kváskového chleba</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:12px;background:#faf6f0;color:#333}
+  h1{font-size:1.3rem} h2{font-size:1.05rem;margin:0 0 8px} h3{font-size:.9rem;margin:12px 0 4px;color:#777}
+  .card{background:#fff;border-radius:10px;padding:12px 14px;margin-top:14px;box-shadow:0 1px 3px #0002}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 0}
+  .inp{display:flex;align-items:center;gap:5px}
+  .u{width:34px;font-size:.85rem;color:#777;text-align:left}
+  input,select{padding:7px;font-size:1rem;border:1px solid #bbb;border-radius:6px;box-sizing:border-box;background:#fff}
+  input:disabled{background:#eee;color:#333;font-weight:600}
+  input[type=number]{width:80px;text-align:right}
+  input[type=checkbox]{width:22px;height:22px}
+  input.name{flex:1;min-width:0}
+  select{max-width:220px}
+  button{font-size:1rem;padding:7px 12px;border:1px solid #bbb;border-radius:6px;background:#f3ece1}
+  button.del{padding:7px 10px;color:#a00}
+  button.ph{visibility:hidden}
+  table{width:100%;border-collapse:collapse}
+  th{font-size:.78rem;text-align:right;color:#777;font-weight:600}
+  th:first-child{text-align:left}
+  td{padding:6px 0;border-bottom:1px solid #eee;text-align:right}
+  td:first-child{text-align:left}
+  tr.tot td{font-weight:700;border-top:2px solid #999}
+  .hint{font-size:.78rem;color:#777;margin:4px 0}
+  .warn{color:#a00;font-size:.85rem;font-weight:600}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<h1>🍞 Kalkulačka kváskového chleba</h1>
+
+<div class="card">
+  <h2>Základ</h2>
+  <div class="row"><span>Hmotnost těsta</span><span class="inp"><input id="dough" type="number" value="1000" inputmode="decimal"><span class="u">g</span></span></div>
+  <div class="row"><span>Levain (z celkové mouky)</span><span class="inp"><input id="levain" type="number" value="10" step="0.5" inputmode="decimal"><span class="u">%</span></span></div>
+  <div class="row"><span>Předfermentovaná mouka</span><b id="pff"></b></div>
+</div>
+
+<div class="card">
+  <h2>Kvásek a levain</h2>
+  <p class="hint">Díly určují poměr složek. Např. 1 : 1 = stejně mouky a vody.</p>
+  <h3>Zralý kvásek (udržovaný)</h3>
+  <div class="row"><span>Mouka v kvásku</span><select id="starterFlour"></select></div>
+  <div class="row"><span>Mouka</span><span class="inp"><input id="sFlour" type="number" value="1" step="0.1" inputmode="decimal"><span class="u">díl</span></span></div>
+  <div class="row"><span>Voda</span><span class="inp"><input id="sWater" type="number" value="1" step="0.1" inputmode="decimal"><span class="u">díl</span></span></div>
+  <h3>Levain (stavba před pečením)</h3>
+  <div class="row"><span>Mouka v levain</span><select id="levainFlour"></select></div>
+  <div class="row"><span>Mouka</span><span class="inp"><input id="lFlour" type="number" value="1" step="0.1" inputmode="decimal"><span class="u">díl</span></span></div>
+  <div class="row"><span>Voda</span><span class="inp"><input id="lWater" type="number" value="1" step="0.1" inputmode="decimal"><span class="u">díl</span></span></div>
+  <div class="row"><span>Zralý kvásek</span><span class="inp"><input id="lStarter" type="number" value="1" step="0.1" inputmode="decimal"><span class="u">díl</span></span></div>
+</div>
+
+<div class="card">
+  <h2>Tangzhong</h2>
+  <label class="row"><span>Použít tangzhong</span><input id="tzOn" type="checkbox"></label>
+  <div id="tzBox" class="hidden">
+    <div class="row"><span>Mouka v tangzhongu</span><select id="tzFlour"></select></div>
+    <div class="row"><span>Množství mouky (z celkové mouky)</span><span class="inp"><input id="tzP" type="number" value="5" step="0.5" inputmode="decimal"><span class="u">%</span></span></div>
+    <div class="row"><span>Poměr mouka : voda &nbsp;1 :</span><span class="inp"><input id="tzW" type="number" value="3" step="0.1" inputmode="decimal"><span class="u">díl</span></span></div>
+    <div class="row"><span>Mouka / voda / celkem</span><b id="tzInfo"></b></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Složení</h2>
+  <p class="hint">Pekařská procenta: všechny mouky dohromady = 100 %. Voda, sůl a přísady jsou % z celkové mouky.</p>
+  <h3>Mouky (% z celkové mouky)</h3>
+  <div id="flours"></div>
+  <p class="hint">První mouka je dopočet do 100 %.</p>
+  <button id="addFlour">+ Přidat mouku</button>
+  <div id="flourWarn" class="warn"></div>
+  <h3>Voda a sůl (% z mouky)</h3>
+  <div id="fixed"></div>
+  <h3>Přísady, např. semínka (% z mouky)</h3>
+  <div id="extras"></div>
+  <button id="addExtra">+ Přidat přísadu</button>
+  <div class="row" style="margin-top:12px"><b>Součet všech složek</b><b id="sumPct"></b></div>
+</div>
+
+<div class="card"><h2>Celkové suroviny</h2><table id="tTotal"></table>
+  <p class="hint">Ferment = v kvásku a levain. Tangzhong = v tangzhongu. Těsto = zbytek k přidání.</p></div>
+<div class="card"><h2>Kvásek</h2><table id="tStarter"></table></div>
+<div class="card"><h2>Levain</h2><table id="tLevain"></table></div>
+<div class="card hidden" id="tzCard"><h2>Tangzhong</h2><table id="tTz"></table></div>
+<div class="card"><h2>Hlavní těsto</h2><table id="tMain"></table><div id="warn" class="warn"></div></div>
+
+<script>
+const DEFAULT = {
+  flours:[{n:"Hladká mouka",p:95},{n:"Celozrnná mouka",p:5}],
+  water:72, salt:2,
+  extras:[{n:"Slunečnicová semínka",p:5}],
+  starterFlour:1, levainFlour:1,
+  tz:{on:false,flour:0,p:5,w:3}
+};
+let S;
+try{ S = JSON.parse(localStorage.getItem("kv_state5")||"null"); }catch(e){}
+if(!S) S = JSON.parse(JSON.stringify(DEFAULT));
+
+const $ = id => parseFloat(document.getElementById(id).value)||0;
+const f = x => (Math.round(x*10)/10).toLocaleString("cs-CZ",{minimumFractionDigits:1,maximumFractionDigits:1});
+const pf = x => (Math.round(x*10)/10).toLocaleString("cs-CZ")+" %";
+const esc = s => s.replace(/"/g,'&quot;').replace(/</g,'&lt;');
+const FSEL = ["starterFlour","levainFlour"];
+
+function listHTML(arr,key){
+  return arr.map((it,i)=>{
+    const first = key==="flours" && i===0;
+    return `<div class="row">
+    <input class="name" data-k="${key}" data-i="${i}" value="${esc(it.n)}">
+    <span class="inp"><input type="number" step="0.5" inputmode="decimal" data-k="${key}" data-i="${i}" data-p="1" value="${it.p}" ${first?"disabled":""}><span class="u">%</span></span>
+    <button class="del ${first&&arr.length===1?"ph":""}" data-k="${key}" data-i="${i}">✕</button></div>`;
+  }).join("");
+}
+function fillSelects(){
+  const opts = k => S.flours.map((x,i)=>`<option value="${i}" ${k==i?"selected":""}>${esc(x.n)||"(bez názvu)"}</option>`).join("");
+  FSEL.forEach(k=>{
+    if(S[k]>=S.flours.length) S[k]=Math.max(0,S.flours.length-1);
+    document.getElementById(k).innerHTML = opts(S[k]);
+  });
+  if(S.tz.flour>=S.flours.length) S.tz.flour=Math.max(0,S.flours.length-1);
+  document.getElementById("tzFlour").innerHTML = opts(S.tz.flour);
+}
+function build(){
+  document.getElementById("flours").innerHTML = listHTML(S.flours,"flours");
+  document.getElementById("extras").innerHTML = listHTML(S.extras,"extras");
+  document.getElementById("fixed").innerHTML =
+   `<div class="row"><span>Voda</span><span class="inp"><input type="number" step="0.5" inputmode="decimal" id="water" value="${S.water}"><span class="u">%</span></span></div>
+    <div class="row"><span>Sůl</span><span class="inp"><input type="number" step="0.1" inputmode="decimal" id="salt" value="${S.salt}"><span class="u">%</span></span></div>`;
+  fillSelects();
+  document.getElementById("tzOn").checked = S.tz.on;
+  document.getElementById("tzP").value = S.tz.p;
+  document.getElementById("tzW").value = S.tz.w;
+  document.querySelectorAll("#flours input,#extras input").forEach(e=>e.addEventListener("input",ev=>{
+    const t=ev.target, it=S[t.dataset.k][t.dataset.i];
+    if(t.dataset.p) it.p=parseFloat(t.value)||0; else {it.n=t.value; if(t.dataset.k==="flours") fillSelects();}
+    calc();
+  }));
+  document.querySelectorAll("button.del").forEach(b=>b.addEventListener("click",ev=>{
+    const k=ev.target.dataset.k, i=+ev.target.dataset.i;
+    if(k==="flours" && S.flours.length<=1) return;
+    if(k==="flours"){
+      [...FSEL].forEach(s=>{ if(S[s]>i) S[s]--; else if(S[s]===i) S[s]=0; });
+      if(S.tz.flour>i) S.tz.flour--; else if(S.tz.flour===i) S.tz.flour=0;
+    }
+    S[k].splice(i,1); build(); calc();
+  }));
+  document.getElementById("water").addEventListener("input",e=>{S.water=parseFloat(e.target.value)||0;calc();});
+  document.getElementById("salt").addEventListener("input",e=>{S.salt=parseFloat(e.target.value)||0;calc();});
+}
+document.getElementById("addFlour").onclick=()=>{S.flours.push({n:"Nová mouka",p:0});build();calc();};
+document.getElementById("addExtra").onclick=()=>{S.extras.push({n:"Nová přísada",p:0});build();calc();};
+FSEL.forEach(k=>document.getElementById(k).onchange=e=>{S[k]=+e.target.value;calc();});
+document.getElementById("tzFlour").onchange=e=>{S.tz.flour=+e.target.value;calc();};
+document.getElementById("tzOn").onchange=e=>{S.tz.on=e.target.checked;calc();};
+document.getElementById("tzP").addEventListener("input",e=>{S.tz.p=parseFloat(e.target.value)||0;calc();});
+document.getElementById("tzW").addEventListener("input",e=>{S.tz.w=parseFloat(e.target.value)||0;calc();});
+
+function table(el, head, rows, total){
+  let h = `<tr>${head.map(x=>`<th>${x}</th>`).join("")}</tr>`;
+  h += rows.map(r=>`<tr>${r.map(x=>`<td>${x}</td>`).join("")}</tr>`).join("");
+  if(total) h += `<tr class="tot">${total.map(x=>`<td>${x}</td>`).join("")}</tr>`;
+  document.getElementById(el).innerHTML = h;
+}
+
+function calc(){
+  const nF=S.flours.length;
+  let fw="";
+  if(nF>0){
+    const others = S.flours.slice(1).reduce((a,b)=>a+b.p,0);
+    let rest = Math.round((100-others)*100)/100;
+    if(rest<0){ fw="Ostatní mouky přesahují 100 %. Snižte je."; rest=0; }
+    S.flours[0].p = rest;
+    const el = document.querySelector('#flours input[data-p][data-i="0"]');
+    if(el) el.value = rest;
+  }
+  document.getElementById("flourWarn").textContent = fw;
+  try{localStorage.setItem("kv_state5",JSON.stringify(S));}catch(e){}
+
+  const dough=$("dough"), lev=$("levain")/100;
+  const all = [
+    ...S.flours.map(x=>({n:x.n,p:x.p})),
+    {n:"Voda",p:S.water},
+    {n:"Sůl",p:S.salt},
+    ...S.extras.map(x=>({n:x.n,p:x.p}))
+  ];
+  const sumP = all.reduce((a,b)=>a+b.p/100,0);
+  const F = sumP>0 ? dough/sumP : 0;
+  const w = all.map(it=>it.p/100*F);
+
+  const levW = lev*F;
+  const lt = $("lFlour")+$("lWater")+$("lStarter");
+  const lF = lt? levW*$("lFlour")/lt:0, lW = lt? levW*$("lWater")/lt:0, lS = lt? levW*$("lStarter")/lt:0;
+  const st = $("sFlour")+$("sWater");
+  const sF = st? lS*$("sFlour")/st:0, sW = st? lS*$("sWater")/st:0;
+  const prefFlour = lF+sF, prefWater = lW+sW;
+
+  const ferm = all.map(()=>0), tz = all.map(()=>0);
+  if(nF>0){ ferm[S.levainFlour]+=lF; ferm[S.starterFlour]+=sF; }
+  ferm[nF]+=prefWater;
+
+  const tzOn = S.tz.on && nF>0;
+  const tzF = tzOn ? S.tz.p/100*F : 0, tzWt = tzF*S.tz.w;
+  if(tzOn){ tz[S.tz.flour]+=tzF; tz[nF]+=tzWt; }
+
+  document.getElementById("tzBox").classList.toggle("hidden",!S.tz.on);
+  document.getElementById("tzCard").classList.toggle("hidden",!tzOn);
+  document.getElementById("tzInfo").textContent = f(tzF)+" g / "+f(tzWt)+" g / "+f(tzF+tzWt)+" g";
+
+  document.getElementById("pff").textContent = f(prefFlour)+" g ("+pf(F? prefFlour/F*100:0)+" z mouky)";
+  document.getElementById("sumPct").textContent = pf(sumP*100);
+
+  const names = S.flours.map(x=>x.n);
+  const sum_ = a=>a.reduce((x,y)=>x+y,0);
+  const tw=sum_(w), tf=sum_(ferm), tt=sum_(tz);
+  const head=["Surovina","Pekař. (%)","Celkem (g)","Ferment (g)"].concat(tzOn?["Tangzhong (g)"]:[],["Těsto (g)"]);
+  table("tTotal",head,
+    all.map((it,i)=>[it.n,pf(it.p),f(w[i]),f(ferm[i])].concat(tzOn?[f(tz[i])]:[],[f(w[i]-ferm[i]-tz[i])])),
+    ["Celkem",pf(sumP*100),f(tw),f(tf)].concat(tzOn?[f(tt)]:[],[f(tw-tf-tt)]));
+
+  const sName = names[S.starterFlour]||"Mouka", lName = names[S.levainFlour]||"Mouka";
+  table("tStarter",["Zralý kvásek","Díly","Hmotnost (g)"],
+    [[sName,f($("sFlour")),f(sF)],["Voda",f($("sWater")),f(sW)]], ["Celkem",f(st),f(sF+sW)]);
+  table("tLevain",["Levain","Díly","Hmotnost (g)"],
+    [[lName,f($("lFlour")),f(lF)],["Voda",f($("lWater")),f(lW)],["Zralý kvásek ("+sName+")",f($("lStarter")),f(lS)]],
+    ["Celkem",f(lt),f(lF+lW+lS)]);
+  table("tTz",["Tangzhong","Díly","Hmotnost (g)"],
+    [[names[S.tz.flour]||"Mouka","1",f(tzF)],["Voda",f(S.tz.w),f(tzWt)]],["Celkem",f(1+S.tz.w),f(tzF+tzWt)]);
+
+  let sum=levW+tzF+tzWt, warn=[];
+  const rows=[];
+  all.forEach((it,i)=>{
+    const g=w[i]-ferm[i]-tz[i];
+    if(g<-0.05) warn.push(it.n+": ferment a tangzhong potřebují víc, než je v receptu.");
+    sum+=g; rows.push([it.n,f(g)]);
+  });
+  const extra=[["Levain",f(levW)]];
+  if(tzOn) extra.push(["Tangzhong",f(tzF+tzWt)]);
+  rows.splice(nF+2,0,...extra);
+  table("tMain",["Surovina","Hmotnost (g)"],rows,["Celkem",f(sum)]);
+  document.getElementById("warn").innerHTML = warn.join("<br>");
+}
+
+["dough","levain","sFlour","sWater","lFlour","lWater","lStarter"].forEach(id=>document.getElementById(id).addEventListener("input",calc));
+build(); calc();
+</script>
+</body>
+</html>
