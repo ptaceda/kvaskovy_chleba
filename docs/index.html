@@ -68,7 +68,7 @@
 
 <div class="card">
   <h2>Složení</h2>
-  <p class="hint">Pekařská procenta: všechny mouky dohromady = 100 %. Voda, sůl a přísady jsou % z celkové mouky.</p>
+  <p class="hint">Pekařská procenta: všechny mouky dohromady = 100 %. Voda a sůl jsou % z celkové mouky. Přísady se zadávají v gramech a jejich hmotnost se odečte od hmotnosti těsta.</p>
   <h3>Mouky (% z celkové mouky)</h3>
   <div id="flours"></div>
   <p class="hint">První mouka je dopočet do 100 %.</p>
@@ -76,10 +76,21 @@
   <div id="flourWarn" class="warn"></div>
   <h3>Voda a sůl (% z mouky)</h3>
   <div id="fixed"></div>
-  <h3>Přísady, např. semínka (% z mouky)</h3>
+  <h3>Přísady, např. semínka (g)</h3>
   <div id="extras"></div>
   <button id="addExtra">+ Přidat přísadu</button>
   <div class="row" style="margin-top:12px"><b>Součet všech složek</b><b id="sumPct"></b></div>
+</div>
+
+<div class="card">
+  <h2>Recept</h2>
+  <div class="row"><span>Název</span><input id="rName" class="name" value="Můj chleba"></div>
+  <div class="row">
+    <button id="btnSave">💾 Uložit do zařízení</button>
+    <button id="btnLoad">📂 Načíst recept</button>
+    <input id="fileIn" type="file" accept=".json,application/json" class="hidden">
+  </div>
+  <div id="ioMsg" class="hint"></div>
 </div>
 
 <div class="card"><h2>Celkové suroviny</h2><table id="tTotal"></table>
@@ -97,12 +108,13 @@ const DEFAULT = {
     {n:"Hladká mouka extra silná",p:20}
   ],
   water:72, salt:2,
-  extras:[{n:"Slunečnicová semínka",p:5}],
+  extras:[{n:"Slunečnicová semínka",g:20}],
   starterFlour:0, levainFlour:0,
   tz:{on:false,flour:0,p:5,w:3}
 };
+const KEY="kv_state7";
 let S;
-try{ S = JSON.parse(localStorage.getItem("kv_state6")||"null"); }catch(e){}
+try{ S = JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){}
 if(!S) S = JSON.parse(JSON.stringify(DEFAULT));
 
 const $ = id => parseFloat(document.getElementById(id).value)||0;
@@ -112,11 +124,12 @@ const esc = s => s.replace(/"/g,'&quot;').replace(/</g,'&lt;');
 const FSEL = ["starterFlour","levainFlour"];
 
 function listHTML(arr,key){
+  const g = key==="extras";
   return arr.map((it,i)=>{
     const first = key==="flours" && i===0;
     return `<div class="row">
     <input class="name" data-k="${key}" data-i="${i}" value="${esc(it.n)}">
-    <span class="inp"><input type="number" step="0.5" inputmode="decimal" data-k="${key}" data-i="${i}" data-p="1" value="${it.p}" ${first?"disabled":""}><span class="u">%</span></span>
+    <span class="inp"><input type="number" step="${g?1:0.5}" min="0" inputmode="decimal" data-k="${key}" data-i="${i}" data-${g?"g":"p"}="1" value="${g?it.g:it.p}" ${first?"disabled":""}><span class="u">${g?"g":"%"}</span></span>
     <button class="del ${first&&arr.length===1?"ph":""}" data-k="${key}" data-i="${i}">✕</button></div>`;
   }).join("");
 }
@@ -141,7 +154,9 @@ function build(){
   document.getElementById("tzW").value = S.tz.w;
   document.querySelectorAll("#flours input,#extras input").forEach(e=>e.addEventListener("input",ev=>{
     const t=ev.target, it=S[t.dataset.k][t.dataset.i];
-    if(t.dataset.p) it.p=parseFloat(t.value)||0; else {it.n=t.value; if(t.dataset.k==="flours") fillSelects();}
+    if(t.dataset.p) it.p=parseFloat(t.value)||0;
+    else if(t.dataset.g) it.g=parseFloat(t.value)||0;
+    else {it.n=t.value; if(t.dataset.k==="flours") fillSelects();}
     calc();
   }));
   document.querySelectorAll("button.del").forEach(b=>b.addEventListener("click",ev=>{
@@ -157,7 +172,7 @@ function build(){
   document.getElementById("salt").addEventListener("input",e=>{S.salt=parseFloat(e.target.value)||0;calc();});
 }
 document.getElementById("addFlour").onclick=()=>{S.flours.push({n:"Nová mouka",p:0});build();calc();};
-document.getElementById("addExtra").onclick=()=>{S.extras.push({n:"Nová přísada",p:0});build();calc();};
+document.getElementById("addExtra").onclick=()=>{S.extras.push({n:"Nová přísada",g:0});build();calc();};
 FSEL.forEach(k=>document.getElementById(k).onchange=e=>{S[k]=+e.target.value;calc();});
 document.getElementById("tzFlour").onchange=e=>{S.tz.flour=+e.target.value;calc();};
 document.getElementById("tzOn").onchange=e=>{S.tz.on=e.target.checked;calc();};
@@ -183,18 +198,23 @@ function calc(){
     if(el) el.value = rest;
   }
   document.getElementById("flourWarn").textContent = fw;
-  try{localStorage.setItem("kv_state5",JSON.stringify(S));}catch(e){}
+  try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
 
   const dough=$("dough"), lev=$("levain")/100;
-  const all = [
+  const exG = S.extras.reduce((a,b)=>a+b.g,0);
+  const base = [
     ...S.flours.map(x=>({n:x.n,p:x.p})),
     {n:"Voda",p:S.water},
-    {n:"Sůl",p:S.salt},
-    ...S.extras.map(x=>({n:x.n,p:x.p}))
+    {n:"Sůl",p:S.salt}
   ];
+  const baseP = base.reduce((a,b)=>a+b.p/100,0);
+  let avail = dough-exG, exWarn="";
+  if(avail<0){ exWarn="Přísady přesahují hmotnost těsta."; avail=0; }
+  if(exWarn) document.getElementById("flourWarn").textContent = (fw+" "+exWarn).trim();
+  const F = baseP>0 ? avail/baseP : 0;
+  const all = [...base, ...S.extras.map(x=>({n:x.n,p:F? x.g/F*100:0}))];
   const sumP = all.reduce((a,b)=>a+b.p/100,0);
-  const F = sumP>0 ? dough/sumP : 0;
-  const w = all.map(it=>it.p/100*F);
+  const w = all.map((it,i)=> i<base.length ? it.p/100*F : S.extras[i-base.length].g);
 
   const levW = lev*F;
   const lt = $("lFlour")+$("lWater")+$("lStarter");
@@ -249,7 +269,43 @@ function calc(){
   document.getElementById("warn").innerHTML = warn.join("<br>");
 }
 
-["dough","levain","sFlour","sWater","lFlour","lWater","lStarter"].forEach(id=>document.getElementById(id).addEventListener("input",calc));
+const IDS=["dough","levain","sFlour","sWater","lFlour","lWater","lStarter"];
+IDS.forEach(id=>document.getElementById(id).addEventListener("input",calc));
+function msg(t,err){const m=document.getElementById("ioMsg");m.textContent=t;m.style.color=err?"#a00":"#777";}
+
+document.getElementById("btnSave").onclick=()=>{
+  const name=document.getElementById("rName").value.trim()||"recept";
+  const data={format:"kvaskovy-chleba",version:1,name,saved:new Date().toISOString(),
+    params:Object.fromEntries(IDS.map(id=>[id,$(id)])),state:S};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=(name.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9]+/g,"_").replace(/^_|_$/g,"").toLowerCase()||"recept")+".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  msg("Recept uložen: "+a.download);
+};
+
+document.getElementById("btnLoad").onclick=()=>document.getElementById("fileIn").click();
+document.getElementById("fileIn").onchange=e=>{
+  const file=e.target.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const d=JSON.parse(r.result), s=d.state;
+      if(d.format!=="kvaskovy-chleba"||!s||!Array.isArray(s.flours)||!s.flours.length||!Array.isArray(s.extras)) throw new Error("Neplatný formát souboru.");
+      if(!s.flours.every(x=>typeof x.n==="string"&&Number.isFinite(x.p))) throw new Error("Chybné údaje u mouk.");
+      if(!s.extras.every(x=>typeof x.n==="string"&&Number.isFinite(x.g))) throw new Error("Chybné údaje u přísad.");
+      S=Object.assign(JSON.parse(JSON.stringify(DEFAULT)),s);
+      S.tz=Object.assign({},DEFAULT.tz,s.tz);
+      IDS.forEach(id=>{ if(d.params&&Number.isFinite(d.params[id])) document.getElementById(id).value=d.params[id]; });
+      document.getElementById("rName").value=d.name||"";
+      build(); calc(); msg("Načteno: "+file.name);
+    }catch(err){ msg("Načtení selhalo: "+err.message,true); }
+  };
+  r.readAsText(file);
+  e.target.value="";
+};
 build(); calc();
 </script>
 </body>
